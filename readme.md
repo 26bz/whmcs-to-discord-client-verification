@@ -1,6 +1,6 @@
 # WHMCS Discord Client Verification
 
-This integration allows paying customers to obtain a Discord role by visiting `/discord.php` in your WHMCS installation.
+This integration allows paying customers to obtain a Discord role by visiting `/discord.php` in your WHMCS installation. It features enhanced security measures and error handling for a better user experience.
 
 ## Installation
 
