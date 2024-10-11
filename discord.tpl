@@ -1,5 +1,5 @@
-<div class="w-100 text-center">
-    <h1>{$message}</h1>
+<div class="w-100 text-center mb-10">
+    <h1 class="mb-5">{$message}</h1>
     {if !$verified}
         <a class="btn btn-primary mt-2" href="{$smarty.const.SITE_URL}/discord.php">
             <i class="fas fa-check"></i> Verify Discord
