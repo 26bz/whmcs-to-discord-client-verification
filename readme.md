@@ -39,6 +39,6 @@ This integration allows paying customers to obtain a Discord role by visiting `/
 
 ## Disclaimer
 
-This project doesn't include ongoing support. Feel free to fork and submit a pull request to contribute to future updates. Use at your own risk.
+This project doesn't include support. However, if you discover an issue, please open a github issue, and we'll work to provide a fix. Feel free to fork and submit a pull request to contribute to future updates if you desire. 
 
 If you find this project helpful, consider giving it a star! 🌟
