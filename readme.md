@@ -6,6 +6,7 @@ This integration allows paying customers to obtain a Discord role by visiting `/
 
 1. **Place Files**:
    - Add `discord.php` to the root directory of your WHMCS installation.
+   - Place `discord.tpl` inside your themes folder alongside the other .tpl files
    - Place `config.php` outside the web root or use environment variables to store sensitive credentials securely. Sample `config.php` content:
      ```php
      <?php
