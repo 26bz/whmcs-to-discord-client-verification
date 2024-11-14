@@ -8,8 +8,7 @@ define('CLIENTAREA', true);
 require __DIR__ . '/init.php';
 
 // Load sensitive information from config file
-$config = require __DIR__ . '/config.php';
-
+$config = require '/config.php';
 // Use environment variables for sensitive data
 $client_id = getenv('DISCORD_CLIENT_ID') ?: $config['client_id'];
 $secret_id = getenv('DISCORD_SECRET_ID') ?: $config['secret_id'];
