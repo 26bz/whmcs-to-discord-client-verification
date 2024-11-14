@@ -28,7 +28,7 @@ This integration allows paying customers to obtain a Discord role by visiting `/
    - In `discord.php`, update the line to load sensitive information from `config.php`:
      ```php
      // Load sensitive information from config file
-     $config = require __DIR__ . '/config.php';
+     $config = require '/config.php';
      ```
 
 3. **Create Custom Field**:
