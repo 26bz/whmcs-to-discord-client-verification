@@ -5,7 +5,5 @@
             <i class="fas fa-check"></i> Verify Discord
         </a>
     {/if}
-    <a class="btn btn-secondary mt-2" href="/">
-        <i class="fas fa-house"></i> Return to home
-    </a>
+    <a class="btn btn-secondary mt-2" href="/">Return to home</a>
 </div>

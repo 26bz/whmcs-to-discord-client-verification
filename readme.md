@@ -1,45 +1,90 @@
 # WHMCS Discord Client Verification
 
-This integration allows paying customers to obtain a Discord role by visiting `/discord.php` in your WHMCS installation. It features enhanced security measures and error handling for a better user experience.
+This integration allows WHMCS clients to automatically receive Discord roles based on their account status. Clients with active products receive one role, while verified clients without active products receive a different role. The system automatically updates roles when client status changes.
+
+## Features
+
+- OAuth2 integration for secure Discord verification
+- Automatic role assignment based on client status
+- Different roles for active and inactive product states
+- Automatic role updates via WHMCS hooks:
+  - When products become active/inactive
+  - When client status changes
+  - Daily synchronization via cron
+- CSRF protection and secure error handling
 
 ## Installation
 
-1. **Place Files**:
-   - Add `discord.php` to the root directory of your WHMCS installation.
-   - Place `discord.tpl` inside your themes folder alongside the other .tpl files
-   - Place `config.php` outside the web root or use environment variables to store sensitive credentials securely. Sample `config.php` content:
-     ```php
-     <?php
-     
-     return [
-         'client_id' => 'YOUR_DISCORD_CLIENT_ID',
-         'secret_id' => 'YOUR_DISCORD_SECRET_ID',
-         'scopes' => 'identify email', // Adjust scopes as needed
-         'domainurl' => 'https://billing.yourdomain.com/', // Update with your WHMCS domain URL
-         'redirect_uri' => 'https://billing.yourdomain.com/discord.php',
-         'guild_id' => 'YOUR_DISCORD_GUILD_ID',
-         'role_id' => 'YOUR_DISCORD_ROLE_ID',
-         'bot_token' => 'YOUR_DISCORD_BOT_TOKEN'
-     ];
-     ```
-     Store `config.php` securely outside the web root or use environment variables to prevent unauthorized access.
+1. **File Setup**:
+   - Place `discord.php` in your WHMCS root directory
+   - Add `discord.tpl` to your active template directory (e.g., `/templates/six/`)
+   - Add `hooks/discord.php` to your WHMCS hooks directory
 
-2. **Update Discord.php**:
-   - In `discord.php`, update the line to load sensitive information from `config.php`:
-     ```php
-     // Load sensitive information from config file
-     $config = require '/config.php';
-     ```
+2. **Configuration**:
+   Create `config.php` outside your web root with:
+   ```php
+   <?php
+   return [
+       'client_id' => '',        // Discord Application Client ID
+       'secret_id' => '',        // Discord Application Secret
+       'scopes' => 'identify email',
+       'redirect_uri' => 'https://billing.yourdomain.com/discord.php',
+       'guild_id' => '',         // Your Discord Server ID
+       'active_role_id' => '',   // Role ID for clients with active products
+       'default_role_id' => '',  // Role ID for verified clients without active products
+       'bot_token' => ''         // Your Discord Bot Token
+   ];
+   ```
 
-3. **Create Custom Field**:
-   - [Create a custom client field named `discord` in WHMCS](https://docs.whmcs.com/Custom_Client_Fields) to store the customer's Discord ID.
+3. **Update File Paths**:
+   In both `discord.php` and `hooks/discord.php`, update the config path:
+   ```php
+   $config = require '/path/to/your/config.php';
+   ```
 
-4. **Usage**:
-   - Paying customers can visit `/discord.php` to link their Discord account.
-   - Upon verification, they will receive a Discord role based on their active product status in WHMCS.
+4. **Discord Setup**:
+   - Create a Discord application at [Discord Developer Portal](https://discord.com/developers/applications)
+   - Add your redirect URL to the OAuth2 settings
+   - Create a bot and add it to your server with role management permissions
+   - Create two roles:
+     - One for clients with active products
+     - One for verified clients without active products
 
-## Disclaimer
+5. **WHMCS Setup**:
+   Create a custom client field:
+   - Go to Setup > Custom Client Fields
+   - Add field named "discord"
+   - Set Admin Only = Yes
+   - Save Changes
 
-This project doesn't include support. However, if you discover an issue, please open a github issue, and we'll work to provide a fix. Feel free to fork and submit a pull request to contribute to future updates if you desire. 
+## Environment Variables (Optional)
 
-If you find this project helpful, consider giving it a star! 🌟
+For additional security, you can use environment variables instead of config values:
+- `DISCORD_CLIENT_ID`
+- `DISCORD_SECRET_ID`
+- `DISCORD_BOT_TOKEN`
+
+## How It Works
+
+1. Clients visit `/discord.php` to link their Discord account
+2. Upon verification:
+   - Clients with active products receive the active role
+   - Clients without active products receive the default role
+3. Roles automatically update:
+   - When products are activated/cancelled
+   - When client status changes
+   - During daily WHMCS cron job
+
+## Security Notes
+
+- Store `config.php` outside web root
+- Use environment variables for sensitive data when possible
+- The integration includes CSRF protection
+- OAuth2 flow follows security best practices
+
+## Support
+
+While this project is provided as-is without official support:
+- Report issues via GitHub issues
+- Pull requests are welcome
+- Consider starring if you find it useful

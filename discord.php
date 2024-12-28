@@ -7,16 +7,15 @@ define('CLIENTAREA', true);
 
 require __DIR__ . '/init.php';
 
-// Load sensitive information from config file
+// Load config and hooks
 $config = require '/config.php';
+require_once __DIR__ . '/includes/hooks/discord.php';
+
 // Use environment variables for sensitive data
 $client_id = getenv('DISCORD_CLIENT_ID') ?: $config['client_id'];
 $secret_id = getenv('DISCORD_SECRET_ID') ?: $config['secret_id'];
 $scopes = $config['scopes'];
 $redirect_uri = $config['redirect_uri'];
-$guild_id = $config['guild_id'];
-$role_id = $config['role_id'];
-$bot_token = getenv('DISCORD_BOT_TOKEN') ?: $config['bot_token'];
 
 // Start session
 session_start();
@@ -41,9 +40,9 @@ if ($client) {
 
                 if (isset($userInfo->id)) {
                     updateClientDiscordId($userInfo->id, $client->id);
-                    // Attempt to assign the Discord role
+                    // Use the assignRoleToUser from hooks
                     try {
-                        assignRoleToUser($userInfo->id, $guild_id, $role_id, $bot_token);
+                        assignRoleToUser($userInfo->id, $client->id);
                         $ca->assign('message', "Discord Linked and Role Assigned Successfully");
                     } catch (Exception $e) {
                         $ca->assign('message', "Discord Linked Successfully, but failed to assign role: " . htmlspecialchars($e->getMessage()));
@@ -77,7 +76,7 @@ function exchangeAuthorizationCodeForAccessToken($code, $client_id, $secret_id, 
             'redirect_uri'  => $redirect_uri
         )),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => true // Verify SSL certificates
+        CURLOPT_SSL_VERIFYPEER => true
     ));
 
     $tokenResponse = curl_exec($ch);
@@ -101,7 +100,7 @@ function getUserInfo($accessToken)
     curl_setopt_array($ch, array(
         CURLOPT_HTTPHEADER     => array('Authorization: Bearer ' . $accessToken),
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => true // Verify SSL certificates
+        CURLOPT_SSL_VERIFYPEER => true
     ));
 
     $userInfoResponse = curl_exec($ch);
@@ -138,42 +137,11 @@ function updateClientDiscordId($discordId, $clientId)
 function redirectToDiscordForAuthorization($clientId, $redirectUri, $scopes)
 {
     // Generate CSRF token
-    $csrfToken = bin2hex(random_bytes(32)); // 32 bytes gives you a 64 character token
+    $csrfToken = bin2hex(random_bytes(32));
     $_SESSION['csrf_token'] = $csrfToken;
 
-    // Append the CSRF token to the state parameter
     $authorizationUrl = 'https://discord.com/oauth2/authorize?response_type=code&client_id=' . $clientId . '&redirect_uri=' . urlencode($redirectUri) . '&scope=' . urlencode($scopes) . '&state=' . $csrfToken;
 
     header('Location: ' . $authorizationUrl);
     exit();
-}
-
-function assignRoleToUser($userId, $guildId, $roleId, $botToken)
-{
-    $url = "https://discord.com/api/guilds/$guildId/members/$userId/roles/$roleId";
-    $ch = curl_init($url);
-
-    curl_setopt_array($ch, [
-        CURLOPT_CUSTOMREQUEST => "PUT", 
-        CURLOPT_HTTPHEADER    => [
-            'Authorization: Bot ' . $botToken,
-            'Content-Type: application/json',
-        ],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => true // Verify SSL certificates
-    ]);
-
-    $response = curl_exec($ch);
-
-    if ($response === false) {
-        throw new Exception('Failed to assign role: ' . curl_error($ch));
-    }
-
-    $result = json_decode($response);
-
-    if (isset($result->code) && $result->code !== 0) {
-        throw new Exception('Failed to assign role: ' . json_encode($result));
-    }
-
-    curl_close($ch);
 }

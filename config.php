@@ -7,7 +7,8 @@ return [
     'domainurl' => 'https://example.com/',
     'redirect_uri' => 'https://billing.example.com/discord.php',
     'guild_id' => '',
-    'role_id' => '',
+    'active_role_id' => '',
+    'default_role_id' => '',
     'bot_token' => ''
 ];
 
