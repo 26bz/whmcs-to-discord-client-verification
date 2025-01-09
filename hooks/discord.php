@@ -2,6 +2,7 @@
 // includes/hooks/discord.php
 
 use WHMCS\Database\Capsule;
+use WHMCS\View\Menu\Item as MenuItem;
 
 // Global configuration
 global $discord_config;
@@ -94,7 +95,23 @@ function assignRoleToUser($userId, $clientId)
         $discord_config['active_role_id'];
     removeRole($userId, $discord_config['guild_id'], $roleToRemove, $discord_config['bot_token']);
 }
-
+add_hook('ClientAreaSecondaryNavbar', 1, function($secondaryNavbar) {
+    try {
+        if ($accountMenu = $secondaryNavbar->getChild('Account')) {
+            $accountMenu->addChild(
+                'customSubButton',
+                [
+                    'name' => 'Verify Discord',
+                    'label' => 'Verify Discord',
+                    'uri' => '/discord.php',
+                    'order' => 84,
+                ]
+            );
+        }
+    } catch (\Exception $e) {
+        logActivity("Secondary navbar hook error: " . $e->getMessage());
+    }
+});
 add_hook('DailyCronJob', 1, function () {
     global $discord_config;
 
