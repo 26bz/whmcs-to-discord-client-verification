@@ -8,96 +8,29 @@ global $discord_config;
 $discord_config = require '/config.php';
 $discord_config['bot_token'] = getenv('DISCORD_BOT_TOKEN') ?: $discord_config['bot_token'];
 
-add_hook('DailyCronJob', 1, function() {
-    global $discord_config;
-    
-    try {
-        // Get all clients with Discord IDs from custom fields
-        $clients = Capsule::table('tblcustomfields')
-            ->where('fieldname', 'LIKE', '%discord%')
-            ->join('tblcustomfieldsvalues', 'tblcustomfields.id', '=', 'tblcustomfieldsvalues.fieldid')
-            ->join('tblclients', 'tblcustomfieldsvalues.relid', '=', 'tblclients.id')
-            ->select('tblclients.id', 'tblclients.status', 'tblcustomfieldsvalues.value as discord_id')
-            ->get();
+function checkDiscordMembership($userId, $guildId, $botToken)
+{
+    $url = "https://discord.com/api/guilds/$guildId/members/$userId";
+    $ch = curl_init($url);
 
-        foreach ($clients as $client) {
-            if (empty($client->discord_id)) continue;
+    curl_setopt_array($ch, [
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bot ' . $botToken,
+            'Content-Type: application/json',
+        ],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_TIMEOUT => 10
+    ]);
 
-            $activeProducts = Capsule::table('tblhosting')
-                ->where('userid', $client->id)
-                ->where('domainstatus', 'Active')
-                ->count();
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    return $httpCode === 200;
+}
 
-            if ($client->status == 'Inactive') {
-                // Remove both roles if client is inactive
-                removeRole($client->discord_id, $discord_config['guild_id'], $discord_config['active_role_id'], $discord_config['bot_token']);
-                removeRole($client->discord_id, $discord_config['guild_id'], $discord_config['default_role_id'], $discord_config['bot_token']);
-                logActivity("Removed Discord roles for inactive client ID: " . $client->id);
-            } else {
-                // Assign appropriate role based on product status
-                try {
-                    assignRoleToUser($client->discord_id, $client->id);
-                    logActivity("Updated Discord role for client ID: " . $client->id);
-                } catch (Exception $e) {
-                    logActivity("Failed to update Discord role for client ID: " . $client->id . " - " . $e->getMessage());
-                }
-            }
-        }
-    } catch (Exception $e) {
-        logActivity("Discord role sync failed: " . $e->getMessage());
-    }
-});
-
-add_hook('ServiceStatusChange', 1, function($vars) {
-    global $discord_config;
-    
-    // Only proceed if the service status is changing to or from 'Active'
-    if ($vars['oldstatus'] !== 'Active' && $vars['status'] !== 'Active') {
-        return;
-    }
-
-    try {
-        // Get client's Discord ID
-        $discordId = Capsule::table('tblcustomfields')
-            ->join('tblcustomfieldsvalues', 'tblcustomfields.id', '=', 'tblcustomfieldsvalues.fieldid')
-            ->where('tblcustomfields.fieldname', 'LIKE', '%discord%')
-            ->where('tblcustomfieldsvalues.relid', $vars['userid'])
-            ->value('tblcustomfieldsvalues.value');
-
-        if ($discordId) {
-            assignRoleToUser($discordId, $vars['userid']);
-        }
-    } catch (Exception $e) {
-        logActivity("Failed to update Discord role on service status change - User ID: {$vars['userid']} - " . $e->getMessage());
-    }
-});
-
-add_hook('ClientStatusChange', 1, function($vars) {
-    global $discord_config;
-    
-    try {
-        // Get client's Discord ID
-        $discordId = Capsule::table('tblcustomfields')
-            ->join('tblcustomfieldsvalues', 'tblcustomfields.id', '=', 'tblcustomfieldsvalues.fieldid')
-            ->where('tblcustomfields.fieldname', 'LIKE', '%discord%')
-            ->where('tblcustomfieldsvalues.relid', $vars['userid'])
-            ->value('tblcustomfieldsvalues.value');
-
-        if ($discordId) {
-            if ($vars['status'] == 'Inactive') {
-                // Remove roles for inactive clients
-                removeRole($discordId, $discord_config['guild_id'], $discord_config['active_role_id'], $discord_config['bot_token']);
-                removeRole($discordId, $discord_config['guild_id'], $discord_config['default_role_id'], $discord_config['bot_token']);
-            } else {
-                assignRoleToUser($discordId, $vars['userid']);
-            }
-        }
-    } catch (Exception $e) {
-        logActivity("Failed to update Discord role on client status change - User ID: {$vars['userid']} - " . $e->getMessage());
-    }
-});
-
-function removeRole($userId, $guildId, $roleId, $botToken) {
+function removeRole($userId, $guildId, $roleId, $botToken)
+{
     $url = "https://discord.com/api/guilds/$guildId/members/$userId/roles/$roleId";
     $ch = curl_init($url);
 
@@ -108,25 +41,28 @@ function removeRole($userId, $guildId, $roleId, $botToken) {
             'Content-Type: application/json',
         ],
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => true
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_TIMEOUT => 10
     ]);
 
-    curl_exec($ch);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
+    return in_array($httpCode, [204, 404]);
 }
 
-function assignRoleToUser($userId, $clientId) {
+function assignRoleToUser($userId, $clientId)
+{
     global $discord_config;
-    
+
     // Check if client has active products
     $activeProducts = Capsule::table('tblhosting')
         ->where('userid', $clientId)
         ->where('domainstatus', 'Active')
         ->count();
 
-    // Determine which role to assign
     $roleId = $activeProducts > 0 ? $discord_config['active_role_id'] : $discord_config['default_role_id'];
-    
+
     $url = "https://discord.com/api/guilds/{$discord_config['guild_id']}/members/$userId/roles/$roleId";
     $ch = curl_init($url);
 
@@ -137,18 +73,128 @@ function assignRoleToUser($userId, $clientId) {
             'Content-Type: application/json',
         ],
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_SSL_VERIFYPEER => true
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_TIMEOUT => 10
     ]);
 
     $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
     if ($response === false) {
         throw new Exception('Failed to assign role: ' . curl_error($ch));
     }
 
-    // Remove the other role if it exists
-    $roleToRemove = $roleId === $discord_config['active_role_id'] ? $discord_config['default_role_id'] : $discord_config['active_role_id'];
-    removeRole($userId, $discord_config['guild_id'], $roleToRemove, $discord_config['bot_token']);
+    if (!in_array($httpCode, [204, 404])) {
+        throw new Exception("Discord API error: HTTP $httpCode - $response");
+    }
 
-    curl_close($ch);
+    $roleToRemove = $roleId === $discord_config['active_role_id'] ?
+        $discord_config['default_role_id'] :
+        $discord_config['active_role_id'];
+    removeRole($userId, $discord_config['guild_id'], $roleToRemove, $discord_config['bot_token']);
 }
+
+add_hook('DailyCronJob', 1, function () {
+    global $discord_config;
+
+    try {
+        // Get all clients with Discord IDs from custom fields
+        $clients = Capsule::table('tblcustomfields')
+            ->where('fieldname', 'LIKE', '%discord%')
+            ->join('tblcustomfieldsvalues', 'tblcustomfields.id', '=', 'tblcustomfieldsvalues.fieldid')
+            ->join('tblclients', 'tblcustomfieldsvalues.relid', '=', 'tblclients.id')
+            ->select(
+                'tblclients.id',
+                'tblclients.status',
+                'tblcustomfieldsvalues.value as discord_id'
+            )
+            ->get();
+
+        foreach ($clients as $client) {
+            if (empty($client->discord_id) || !is_numeric($client->discord_id)) {
+                continue;
+            }
+
+            try {
+                if ($client->status == 'Inactive') {
+                    // Remove both roles if client is inactive
+                    $activeRemoved = removeRole(
+                        $client->discord_id,
+                        $discord_config['guild_id'],
+                        $discord_config['active_role_id'],
+                        $discord_config['bot_token']
+                    );
+
+                    $defaultRemoved = removeRole(
+                        $client->discord_id,
+                        $discord_config['guild_id'],
+                        $discord_config['default_role_id'],
+                        $discord_config['bot_token']
+                    );
+
+                    if ($activeRemoved || $defaultRemoved) {
+                        logActivity("Removed Discord roles for inactive client ID: {$client->id}");
+                    }
+                } else {
+                    try {
+                        assignRoleToUser($client->discord_id, $client->id);
+                        logActivity("Updated Discord role for client ID: {$client->id}");
+                    } catch (Exception $e) {
+                        logActivity("Failed to update Discord role for client ID: {$client->id} - " . $e->getMessage());
+                    }
+                }
+            } catch (Exception $e) {
+                logActivity("Error processing Discord roles for client ID: {$client->id} - " . $e->getMessage());
+                continue;
+            }
+        }
+    } catch (Exception $e) {
+        logActivity("Discord role sync failed: " . $e->getMessage());
+    }
+});
+
+add_hook('ServiceStatusChange', 1, function ($vars) {
+    global $discord_config;
+
+    if ($vars['oldstatus'] !== 'Active' && $vars['status'] !== 'Active') {
+        return;
+    }
+
+    try {
+        $discordId = Capsule::table('tblcustomfields')
+            ->join('tblcustomfieldsvalues', 'tblcustomfields.id', '=', 'tblcustomfieldsvalues.fieldid')
+            ->where('tblcustomfields.fieldname', 'LIKE', '%discord%')
+            ->where('tblcustomfieldsvalues.relid', $vars['userid'])
+            ->value('tblcustomfieldsvalues.value');
+
+        if ($discordId && is_numeric($discordId)) {
+            assignRoleToUser($discordId, $vars['userid']);
+        }
+    } catch (Exception $e) {
+        logActivity("Failed to update Discord role on service status change - User ID: {$vars['userid']} - " . $e->getMessage());
+    }
+});
+
+add_hook('ClientStatusChange', 1, function ($vars) {
+    global $discord_config;
+
+    try {
+        $discordId = Capsule::table('tblcustomfields')
+            ->join('tblcustomfieldsvalues', 'tblcustomfields.id', '=', 'tblcustomfieldsvalues.fieldid')
+            ->where('tblcustomfields.fieldname', 'LIKE', '%discord%')
+            ->where('tblcustomfieldsvalues.relid', $vars['userid'])
+            ->value('tblcustomfieldsvalues.value');
+
+        if ($discordId && is_numeric($discordId)) {
+            if ($vars['status'] == 'Inactive') {
+                removeRole($discordId, $discord_config['guild_id'], $discord_config['active_role_id'], $discord_config['bot_token']);
+                removeRole($discordId, $discord_config['guild_id'], $discord_config['default_role_id'], $discord_config['bot_token']);
+            } else {
+                assignRoleToUser($discordId, $vars['userid']);
+            }
+        }
+    } catch (Exception $e) {
+        logActivity("Failed to update Discord role on client status change - User ID: {$vars['userid']} - " . $e->getMessage());
+    }
+});
