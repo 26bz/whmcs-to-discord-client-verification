@@ -19,10 +19,9 @@ $redirect_uri = $config['redirect_uri'];
 
 session_start();
 $ca = new ClientArea();
-$ca->assign('verified', false);
 $ca->setPageTitle('Discord Connection');
 $ca->initPage();
-
+$ca->assign('verified', false);
 $currentUser = new CurrentUser();
 if (!$currentUser->isAuthenticatedUser()) {
     $ca->assign('message', "You must be logged in to link your Discord account.");
@@ -135,20 +134,19 @@ function getUserInfo($accessToken)
 
 function updateClientDiscordId($discordId, $clientId)
 {
-    $command = 'UpdateClient';
-    $customFields = array('discord' => $discordId);
     $postData = array(
-        'clientid'      => $clientId,
-        'customfields'  => base64_encode(serialize($customFields))
+        'clientid' => $clientId,
+        'customfields' => base64_encode(serialize(array('discord' => $discordId)))
     );
 
-    $results = localAPI($command, $postData);
+    $results = localAPI('UpdateClient', $postData);
 
     if ($results['result'] !== 'success') {
         throw new Exception('Failed to update client Discord ID: ' . $results['message']);
     }
-}
 
+    return true;
+}
 function redirectToDiscordForAuthorization($clientId, $redirectUri, $scopes)
 {
     // Generate CSRF token
