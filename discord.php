@@ -19,6 +19,7 @@ $redirect_uri = $config['redirect_uri'];
 
 session_start();
 $ca = new ClientArea();
+$ca->assign('verified', false);
 $ca->setPageTitle('Discord Connection');
 $ca->initPage();
 
@@ -38,7 +39,6 @@ if (!$client) {
     exit;
 }
 
-// Process OAuth flow
 if (isset($_GET['code'])) {
     // Verify CSRF token
     if (!isset($_GET['state']) || $_GET['state'] !== $_SESSION['csrf_token']) {
@@ -55,7 +55,7 @@ if (isset($_GET['code'])) {
 
             // Update Discord ID and assign role
             updateClientDiscordId($userInfo->id, $client->id);
-            
+
             try {
                 assignRoleToUser($userInfo->id, $client->id);
                 logActivity("Discord successfully linked for Client ID: " . $client->id);
@@ -155,9 +155,9 @@ function redirectToDiscordForAuthorization($clientId, $redirectUri, $scopes)
     $csrfToken = bin2hex(random_bytes(32));
     $_SESSION['csrf_token'] = $csrfToken;
 
-    $authorizationUrl = 'https://discord.com/oauth2/authorize?response_type=code&client_id=' . $clientId . 
-        '&redirect_uri=' . urlencode($redirectUri) . 
-        '&scope=' . urlencode($scopes) . 
+    $authorizationUrl = 'https://discord.com/oauth2/authorize?response_type=code&client_id=' . $clientId .
+        '&redirect_uri=' . urlencode($redirectUri) .
+        '&scope=' . urlencode($scopes) .
         '&state=' . $csrfToken;
 
     header('Location: ' . $authorizationUrl);
