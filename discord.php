@@ -132,21 +132,6 @@ function getUserInfo($accessToken)
     return $userInfo;
 }
 
-function updateClientDiscordId($discordId, $clientId)
-{
-    $postData = array(
-        'clientid' => $clientId,
-        'customfields' => base64_encode(serialize(array('discord' => $discordId)))
-    );
-
-    $results = localAPI('UpdateClient', $postData);
-
-    if ($results['result'] !== 'success') {
-        throw new Exception('Failed to update client Discord ID: ' . $results['message']);
-    }
-
-    return true;
-}
 function redirectToDiscordForAuthorization($clientId, $redirectUri, $scopes)
 {
     // Generate CSRF token

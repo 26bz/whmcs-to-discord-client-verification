@@ -29,7 +29,58 @@ function checkDiscordMembership($userId, $guildId, $botToken)
     curl_close($ch);
     return $httpCode === 200;
 }
+function updateClientDiscordId($discordId, $clientId) {
+    try {
+        $discordFieldId = Capsule::table('tblcustomfields')
+            ->where('fieldname', 'discord')
+            ->value('id');
 
+        if (!$discordFieldId) {
+            throw new Exception('Discord custom field not found');
+        }
+
+        Capsule::table('tblcustomfieldsvalues')
+            ->updateOrInsert(
+                [
+                    'fieldid' => $discordFieldId,
+                    'relid' => $clientId,
+                ],
+                [
+                    'value' => $discordId
+                ]
+            );
+
+        return true;
+
+    } catch (Exception $e) {
+        throw new Exception('Failed to update Discord ID: ' . $e->getMessage());
+    }
+}
+
+add_hook('CustomFieldSave', 1, function($vars) {
+    $fieldName = Capsule::table('tblcustomfields')
+        ->where('id', $vars['fieldid'])
+        ->value('fieldname');
+    
+    // Only process if it's our discord field
+    if (strtolower($fieldName) === 'discord') {
+        $value = $vars['value'];
+        
+        // Clean up the Discord ID - remove any non-numeric characters
+        $cleanValue = preg_replace('/[^0-9]/', '', $value);
+        
+        // Validate Discord ID
+        if (!empty($cleanValue)) {
+            if (strlen($cleanValue) < 17 || strlen($cleanValue) > 20) {
+                throw new Exception('Invalid Discord ID format');
+            }
+            
+            return [
+                'value' => $cleanValue
+            ];
+        }
+    }
+});
 function removeRole($userId, $guildId, $roleId, $botToken)
 {
     $url = "https://discord.com/api/guilds/$guildId/members/$userId/roles/$roleId";
